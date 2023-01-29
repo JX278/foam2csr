@@ -1,0 +1,37 @@
+cmake_minimum_required(VERSION 3.5)
+project(foam_csr)
+FIND_PACKAGE(CUDA REQUIRED)
+FIND_PACKAGE(MPI REQUIRED)
+
+set(CMAKE_INSTALL_PREFIX $ENV{FOAM_USER_LIBBIN}/..)
+set(PETSC_DIR "/home/runze/OpenFOAM/ThirdParty-7/platforms/linux64GccDPInt32/petsc-git")
+set(AMGX_DIR "/home/runze/AmgX/AMGX")
+set ( CUDA_ENABLE true )
+if ( CUDA_ENABLE )
+    enable_language( CUDA )
+endif()
+
+include_directories(
+./
+${AMGX_DIR}/include
+${PETSC_DIR}/include
+${MPI_INCLUDE_PATH}
+${CUDA_INCLUDE_DIRS}
+)
+
+SET(CMAKE_C_COMPILER g++)
+add_compile_options(-std=c++14)
+add_compile_options(-fPIC)
+# add_compile_options(-arch=sm_$(NVARCH))
+set(SRC_LIST AmgXCSRMatrix.cu AmgXMPIComms.cu AmgXSolver.cu)
+
+add_library(foam_csr SHARED ${SRC_LIST})
+
+target_link_libraries(foam_csr ${CUDA_LIBRARIES})
+target_link_libraries(foam_csr ${MPI_LIBRARIES})
+target_link_libraries(foam_csr ${AMGX_DIR}/build/libamgxsh.so)
+target_link_libraries(foam_csr ${PETSC_DIR}/lib/libpetsc.so.3.18.3)
+
+install(TARGETS foam_csr DESTINATION 
+PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE 
+GROUP_READ GROUP_WRITE GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
