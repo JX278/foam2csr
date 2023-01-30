@@ -34,19 +34,24 @@
  * \param call [in] Function call to CUDA API.
  */
 # define CHECK(call)                                                        \
-{                                                                           \
-    const cudaError_t       error = call;                                   \
-    if (error != cudaSuccess)                                               \
-    {                                                                       \
-        SETERRQ4(PETSC_COMM_WORLD, PETSC_ERR_SIG,                           \
-            "Error: %s:%d, code:%d, reason: %s\n",                          \
-            __FILE__, __LINE__, error, cudaGetErrorString(error));          \
-    }                                                                       \
-}
+do                                                    \
+{                                                     \
+    const cudaError_t error_code = call;              \
+    if (error_code != cudaSuccess)                    \
+    {                                                 \
+        printf("CUDA Error:\n");                      \
+        printf("    File:       %s\n", __FILE__);     \
+        printf("    Line:       %d\n", __LINE__);     \
+        printf("    Error code: %d\n", error_code);   \
+        printf("    Error text: %s\n",                \
+            cudaGetErrorString(error_code));          \
+        exit(1);                                      \
+    }                                                 \
+} while (0)
 
 
-/** \brief A shorter macro for checking PETSc returned error code. */
-# define CHK CHKERRQ(ierr)
+
+
 
 
 /** \brief A wrapper class for coupling PETSc and AmgX.
@@ -116,9 +121,8 @@ class AmgXSolver
          * \param modeStr [in] A string; target mode of AmgX (e.g., dDDI).
          * \param cfgFile [in] A string; the path to AmgX configuration file.
          *
-         * \return PetscErrorCode.
          */
-        PetscErrorCode initialize
+        void initialize
         (
             const MPI_Comm &comm,
             const std::string &modeStr,
@@ -126,7 +130,7 @@ class AmgXSolver
         );
 
 
-        PetscErrorCode initialiseMatrixComms
+        void initialiseMatrixComms
         (
             AmgXCSRMatrix& matrix
         );
@@ -137,9 +141,8 @@ class AmgXSolver
          * AmgXSolver instances, the last one destroyed is also in charge of
          * destroying the shared resource object and finalizing AmgX.
          *
-         * \return PetscErrorCode.
          */
-        PetscErrorCode finalize();
+        void finalize();
 
         /** \brief Set up the matrix used by AmgX.
          *
@@ -154,9 +157,8 @@ class AmgXSolver
          * \param values [in] The local CSR matrix values.
          * id of the owning rank for each row.
          *
-         * \return PetscErrorCode.
          */
-        PetscErrorCode setOperator
+        void setOperator
         (
             const PetscInt nLocalRows,
             const PetscInt nGlobalRows,
@@ -173,9 +175,8 @@ class AmgXSolver
          * \param nLocalNz [in] The total number of non zero entries locally.
          * \param values [in] The local CSR matrix values.
          *
-         * \return PetscErrorCode.
          */
-        PetscErrorCode updateOperator
+        void updateOperator
         (
             const PetscInt nLocalRows,
             const PetscInt nLocalNz,
@@ -196,9 +197,8 @@ class AmgXSolver
          * \param bscalar [in] The RHS array.
          * \param matrix [in,out] The AmgX CSR matrix, A.
          *
-         * \return PetscErrorCode.
          */
-        PetscErrorCode solve
+        void solve
         (
             int nLocalRows,
             PetscScalar* pscalar,
@@ -220,9 +220,8 @@ class AmgXSolver
          * \param b [in] The RHS vector.
          * \param matrix [in,out] The AmgX CSR matrix, A.
          *
-         * \return PetscErrorCode.
          */
-        PetscErrorCode solve
+        void solve
         (
             int nLocalRows,
             Vec& p,
@@ -235,9 +234,8 @@ class AmgXSolver
          *
          * \param iter [out] Number of iterations.
          *
-         * \return PetscErrorCode.
          */
-        PetscErrorCode getIters
+        void getIters
         (
             int &iter
         );
@@ -247,9 +245,8 @@ class AmgXSolver
          * \param iter [in] Target iteration.
          * \param res [out] Returned residual.
          *
-         * \return PetscErrorCode.
          */
-        PetscErrorCode getResidual
+        void getResidual
         (
             const int &iter,
             double &res
@@ -351,21 +348,16 @@ class AmgXSolver
          * Available modes are: dDDI, dDFI, dFFI, hDDI, hDFI, hFFI.
          *
          * \param modeStr [in] a std::string.
-         * \return PetscErrorCode.
          */
-        PetscErrorCode setMode(const std::string &modeStr);
+        void setMode(const std::string &modeStr);
 
         /** \brief Get the number of GPU devices on this computing node.
-         *
-         * \return PetscErrorCode.
          */
-        PetscErrorCode setDeviceCount();
+        void setDeviceCount();
 
         /** \brief Set the ID of the corresponding GPU used by this process.
-         *
-         * \return PetscErrorCode.
          */
-        PetscErrorCode setDeviceIDs();
+        void setDeviceIDs();
 
         /** \brief Initialize all MPI communicators.
          *
@@ -373,9 +365,8 @@ class AmgXSolver
          * \ref AmgXSolver::globalCpuWorld "globalCpuWorld".
          *
          * \param comm [in] Global communicator.
-         * \return PetscErrorCode.
          */
-        PetscErrorCode initMPIcomms(const MPI_Comm &comm);
+        void initMPIcomms(const MPI_Comm &comm);
 
         /** \brief Perform necessary initialization of AmgX.
          *
@@ -384,9 +375,8 @@ class AmgXSolver
          * is in charge of initializing AmgX and the resource instance.
          *
          * \param cfgFile [in] Path to AmgX solver configuration file.
-         * \return PetscErrorCode.
          */
-        PetscErrorCode initAmgX(const std::string &cfgFile);
+        void initAmgX(const std::string &cfgFile);
 };
 
 #endif
