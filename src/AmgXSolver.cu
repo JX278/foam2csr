@@ -44,7 +44,7 @@ void AmgXSolver::initialize(const MPI_Comm &comm,
     // if this instance has already been initialized, skip
     if (isInitialised) {
         fprintf(stderr,
-                "This AmgXSolver instance has been initialized on this process.\n")
+                "This AmgXSolver instance has been initialized on this process.\n");
         exit(0);
     }
 
@@ -91,12 +91,12 @@ void AmgXSolver::setMode(const std::string &modeStr)
     else if (modeStr == "dFFI")
         mode = AMGX_mode_dFFI;
     else if (modeStr[0] == 'h') {
-        fprintf("CPU mode, %s, is not supported in this wrapper!",
+        printf("CPU mode, %s, is not supported in this wrapper!",
                 modeStr.c_str());
         exit(0);
     }
     else {
-        fprintf("%s is not an available mode! Available modes are: "
+        printf("%s is not an available mode! Available modes are: "
                 "dDDI, dDFI, dFFI.\n", modeStr.c_str());
         exit(0);
     }
@@ -116,9 +116,9 @@ void AmgXSolver::setMode(const std::string &modeStr)
         AMGX_SAFE_CALL(AMGX_initialize_plugins());
 
         // only the master process can output something on the screen
-        AMGX_SAFE_CALL(AMGX_register_print_callback(
-                    [](const char *msg, int length)->void
-                    {PetscPrintf(PETSC_COMM_WORLD, "%s", msg);}));
+        // AMGX_SAFE_CALL(AMGX_register_print_callback(
+        //             [](const char *msg, int length)->void
+        //             {PetscPrintf(PETSC_COMM_WORLD, "%s", msg);}));
 
         // let AmgX to handle errors returned
         AMGX_SAFE_CALL(AMGX_install_signal_handler());
@@ -193,9 +193,9 @@ void AmgXSolver::finalize()
     // re-set necessary variables in case users want to reuse
     // the variable of this instance for a new instance
     gpuProc = MPI_UNDEFINED;
-    MPI_Comm_free(&globalCpuWorld);  
-    MPI_Comm_free(&localCpuWorld);  
-    MPI_Comm_free(&devWorld);  
+    MPI_Comm_free(&globalCpuWorld);
+    MPI_Comm_free(&localCpuWorld);
+    MPI_Comm_free(&devWorld);
 
     // decrease the number of instances
     count -= 1;
@@ -205,11 +205,11 @@ void AmgXSolver::finalize()
 }
 
 /* \implements AmgXSolver::setOperator */
- void AmgXSolver::setOperator
+void AmgXSolver::setOperator
 (
-    const PetscInt nLocalRows,
-    const PetscInt nGlobalRows,
-    const PetscInt nLocalNz,
+    const int nLocalRows,
+    const int nGlobalRows,
+    const int nLocalNz,
     AmgXCSRMatrix& matrix
 )
 {
@@ -279,19 +279,16 @@ void AmgXSolver::finalize()
 
 
 /* \implements AmgXSolver::updateOperator */
-PetscErrorCode AmgXSolver::updateOperator
+void AmgXSolver::updateOperator
 (
-    const PetscInt nLocalRows,
-    const PetscInt nLocalNz,
+    const int nLocalRows,
+    const int nLocalNz,
     AmgXCSRMatrix& matrix
 )
 {
-    PetscFunctionBeginUser;
-
     const int nRows = (matrix.isConsolidated()) ? matrix.getNConsRows() : nLocalRows;
     const int nNz = (matrix.isConsolidated()) ? matrix.getNConsNz() : nLocalNz;
 
-    int ierr;
     // Replace the coefficients for the CSR matrix A within AmgX
     if (gpuWorld != MPI_COMM_NULL)
     {
@@ -301,54 +298,43 @@ PetscErrorCode AmgXSolver::updateOperator
         AMGX_solver_resetup(solver, AmgXA);
     }
 
-    ierr = MPI_Barrier(globalCpuWorld);
-
-    PetscFunctionReturn(0);
+    MPI_Barrier(globalCpuWorld);
 }
 
 /* \implements AmgXSolver::solve */
-PetscErrorCode AmgXSolver::solve(
-    int nLocalRows, Vec& p, Vec& b, AmgXCSRMatrix& matrix)
-{
-    PetscFunctionBeginUser;
+// void AmgXSolver::solve(
+//     int nLocalRows, Vec& p, Vec& b, AmgXCSRMatrix& matrix)
+// {
+//     double* pscalar;
+//     double* bscalar;
 
-    PetscScalar* pscalar;
-    PetscScalar* bscalar;
+//     // get pointers to the raw data of local vectors
+//     VecGetArray(p, &pscalar);
+//     VecGetArray(b, &bscalar);
 
-    PetscInt ierr;
+//     solve(nLocalRows, pscalar, bscalar, matrix);
 
-    // get pointers to the raw data of local vectors
-    ierr = VecGetArray(p, &pscalar);  
-    ierr = VecGetArray(b, &bscalar);  
-
-    solve(nLocalRows, pscalar, bscalar, matrix);
-
-    ierr = VecRestoreArray(p, &pscalar);  
-    ierr = VecRestoreArray(b, &bscalar);  
-
-    PetscFunctionReturn(0);
-}
+//     VecRestoreArray(p, &pscalar);
+//     VecRestoreArray(b, &bscalar);
+// }
 
 
 /* \implements AmgXSolver::solve */
-PetscErrorCode AmgXSolver::solve(
-    int nLocalRows, PetscScalar* pscalar, PetscScalar* bscalar, AmgXCSRMatrix& matrix)
+void AmgXSolver::solve(
+    int nLocalRows, double* pscalar, double* bscalar, AmgXCSRMatrix& matrix)
 {
-    PetscFunctionBeginUser;
+    double* p;
+    double* b;
+    int nRows;
 
-    PetscScalar* p;
-    PetscScalar* b;
-    PetscInt nRows;
-
-    PetscInt ierr;
     if (matrix.isConsolidated())
     {
         p = matrix.getPCons();
         b = matrix.getRHSCons();
 
         const int* rowDispls = matrix.getRowDispls();
-        CHECK(cudaMemcpy((void **)&p[rowDispls[myDevWorldRank]], pscalar, sizeof(PetscScalar) * nLocalRows, cudaMemcpyDefault));
-        CHECK(cudaMemcpy((void **)&b[rowDispls[myDevWorldRank]], bscalar, sizeof(PetscScalar) * nLocalRows, cudaMemcpyDefault));
+        CHECK(cudaMemcpy((void **)&p[rowDispls[myDevWorldRank]], pscalar, sizeof(double) * nLocalRows, cudaMemcpyDefault));
+        CHECK(cudaMemcpy((void **)&b[rowDispls[myDevWorldRank]], bscalar, sizeof(double) * nLocalRows, cudaMemcpyDefault));
 
         // Override the number of rows as the consolidated number of rows
         nRows = matrix.getNConsRows();
@@ -356,7 +342,7 @@ PetscErrorCode AmgXSolver::solve(
         // Sync as cudaMemcpy to IPC buffers so device to device copies, which are non-blocking w.r.t host
         // All ranks in devWorld have the same value for isConsolidated
         CHECK(cudaDeviceSynchronize());
-        ierr = MPI_Barrier(devWorld);  
+        MPI_Barrier(devWorld);  
     }
     else
     {
@@ -371,7 +357,7 @@ PetscErrorCode AmgXSolver::solve(
         AMGX_vector_upload(AmgXP, nRows, 1, p);
         AMGX_vector_upload(AmgXRHS, nRows, 1, b);
 
-        ierr = MPI_Barrier(gpuWorld);  
+        MPI_Barrier(gpuWorld);  
 
         // Solve
         AMGX_solver_solve(solver, AmgXRHS, AmgXP);
@@ -403,46 +389,36 @@ PetscErrorCode AmgXSolver::solve(
     if (matrix.isConsolidated())
     {
         // Must synchronise before each rank attempts to read from the consolidated solution
-        ierr = MPI_Barrier(devWorld);  
+        MPI_Barrier(devWorld);  
 
         const int* rowDispls = matrix.getRowDispls();
 
         // Ranks copy the portion of the solution they own into their rank-local buffers
-        CHECK(cudaMemcpy((void **)pscalar, &p[rowDispls[myDevWorldRank]], sizeof(PetscScalar) * nLocalRows, cudaMemcpyDefault));
+        CHECK(cudaMemcpy((void **)pscalar, &p[rowDispls[myDevWorldRank]], sizeof(double) * nLocalRows, cudaMemcpyDefault));
 
         // Sync as cudaMemcpy to IPC buffers so device to device copies, which are non-blocking w.r.t host
         // All ranks in devWorld have the same value for isConsolidated
         CHECK(cudaDeviceSynchronize());
     }
 
-    ierr = MPI_Barrier(globalCpuWorld);  
-
-    PetscFunctionReturn(0);
+    MPI_Barrier(globalCpuWorld);  
 }
 
 
 /* \implements AmgXSolver::getIters */
-PetscErrorCode AmgXSolver::getIters(int &iter)
+void AmgXSolver::getIters(int &iter)
 {
-    PetscFunctionBeginUser;
-
     // only processes using AmgX will try to get # of iterations
     if (gpuProc == 0)
         AMGX_solver_get_iterations_number(solver, &iter);
-
-    PetscFunctionReturn(0);
 }
 
 
 /* \implements AmgXSolver::getResidual */
-PetscErrorCode AmgXSolver::getResidual(const int &iter, double &res)
+void AmgXSolver::getResidual(const int &iter, double &res)
 {
-    PetscFunctionBeginUser;
-
     // only processes using AmgX will try to get residual
     if (gpuProc == 0)
         AMGX_solver_get_iteration_residual(solver, iter, 0, &res);
-
-    PetscFunctionReturn(0);
 }
 

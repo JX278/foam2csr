@@ -14,49 +14,45 @@
 
 
 /* \implements AmgXSolver::initMPIcomms */
-PetscErrorCode AmgXSolver::initMPIcomms(const MPI_Comm &comm)
+void AmgXSolver::initMPIcomms(const MPI_Comm &comm)
 {
-    PetscFunctionBeginUser;
-
-    PetscErrorCode      ierr;
-
     // duplicate the global communicator
-    ierr = MPI_Comm_dup(comm, &globalCpuWorld); CHK;
-    ierr = MPI_Comm_set_name(globalCpuWorld, "globalCpuWorld"); CHK;
+    MPI_Comm_dup(comm, &globalCpuWorld);  
+    MPI_Comm_set_name(globalCpuWorld, "globalCpuWorld");  
 
     // get size and rank for global communicator
-    ierr = MPI_Comm_size(globalCpuWorld, &globalSize); CHK;
-    ierr = MPI_Comm_rank(globalCpuWorld, &myGlobalRank); CHK;
+    MPI_Comm_size(globalCpuWorld, &globalSize);  
+    MPI_Comm_rank(globalCpuWorld, &myGlobalRank);  
 
 
     // Get the communicator for processors on the same node (local world)
-    ierr = MPI_Comm_split_type(globalCpuWorld,
-            MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL, &localCpuWorld); CHK;
-    ierr = MPI_Comm_set_name(localCpuWorld, "localCpuWorld"); CHK;
+    MPI_Comm_split_type(globalCpuWorld,
+            MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL, &localCpuWorld);  
+    MPI_Comm_set_name(localCpuWorld, "localCpuWorld");  
 
     // get size and rank for local communicator
-    ierr = MPI_Comm_size(localCpuWorld, &localSize); CHK;
-    ierr = MPI_Comm_rank(localCpuWorld, &myLocalRank); CHK;
+    MPI_Comm_size(localCpuWorld, &localSize);  
+    MPI_Comm_rank(localCpuWorld, &myLocalRank);  
 
 
     // set up the variable nDevs
-    ierr = setDeviceCount(); CHK;
+    setDeviceCount();  
 
 
     // set up corresponding ID of the device used by each local process
-    ierr = setDeviceIDs(); CHK;
-    ierr = MPI_Barrier(globalCpuWorld); CHK;
+    setDeviceIDs();  
+    MPI_Barrier(globalCpuWorld);  
 
 
     // split the global world into a world involved in AmgX and a null world
-    ierr = MPI_Comm_split(globalCpuWorld, gpuProc, 0, &gpuWorld); CHK;
+    MPI_Comm_split(globalCpuWorld, gpuProc, 0, &gpuWorld);  
 
     // get size and rank for the communicator corresponding to gpuWorld
     if (gpuWorld != MPI_COMM_NULL)
     {
-        ierr = MPI_Comm_set_name(gpuWorld, "gpuWorld"); CHK;
-        ierr = MPI_Comm_size(gpuWorld, &gpuWorldSize); CHK;
-        ierr = MPI_Comm_rank(gpuWorld, &myGpuWorldRank); CHK;
+        MPI_Comm_set_name(gpuWorld, "gpuWorld");  
+        MPI_Comm_size(gpuWorld, &gpuWorldSize);  
+        MPI_Comm_rank(gpuWorld, &myGpuWorldRank);  
     }
     else // for those can not communicate with GPU devices
     {
@@ -65,26 +61,20 @@ PetscErrorCode AmgXSolver::initMPIcomms(const MPI_Comm &comm)
     }
 
     // split local world into worlds corresponding to each CUDA device
-    ierr = MPI_Comm_split(localCpuWorld, devID, 0, &devWorld); CHK;
-    ierr = MPI_Comm_set_name(devWorld, "devWorld"); CHK;
+    MPI_Comm_split(localCpuWorld, devID, 0, &devWorld);  
+    MPI_Comm_set_name(devWorld, "devWorld");  
 
     // get size and rank for the communicator corresponding to myWorld
-    ierr = MPI_Comm_size(devWorld, &devWorldSize); CHK;
-    ierr = MPI_Comm_rank(devWorld, &myDevWorldRank); CHK;
+    MPI_Comm_size(devWorld, &devWorldSize);  
+    MPI_Comm_rank(devWorld, &myDevWorldRank);  
 
-    ierr = MPI_Barrier(globalCpuWorld); CHK;
-
-    PetscFunctionReturn(0);
+    MPI_Barrier(globalCpuWorld);  
 }
 
 
 /* \implements AmgXSolver::setDeviceCount */
-PetscErrorCode AmgXSolver::setDeviceCount()
+void AmgXSolver::setDeviceCount()
 {
-    PetscFunctionBeginUser;
-
-    PetscErrorCode      ierr;
-
     // get the number of devices that AmgX solvers can use
     switch (mode)
     {
@@ -93,11 +83,13 @@ PetscErrorCode AmgXSolver::setDeviceCount()
         case AMGX_mode_dFFI: // for GPU cases, nDevs is the # of local GPUs
             // get the number of total cuda devices
             CHECK(cudaGetDeviceCount(&nDevs));
-            ierr = PetscPrintf(localCpuWorld, "Number of GPU devices :: %d \n", nDevs); CHK;
+            if (myLocalRank == 0) printf("Number of GPU devices :: %d \n", nDevs);
 
             // Check whether there is at least one CUDA device on this node
-            if (nDevs == 0) SETERRQ1(MPI_COMM_WORLD, PETSC_ERR_SUP_SYS,
-                    "There is no CUDA device on the node %s !\n", nodeName.c_str());
+            if (nDevs == 0) {
+                printf("There is no CUDA device on the node %s !\n", nodeName.c_str());
+                exit(0);
+            }
             break;
         case AMGX_mode_hDDI: // for CPU cases, nDevs is the # of local processes
         case AMGX_mode_hDFI: // for CPU cases, nDevs is the # of local processes
@@ -106,18 +98,12 @@ PetscErrorCode AmgXSolver::setDeviceCount()
             nDevs = localSize;
             break;
     }
-
-    PetscFunctionReturn(0);
 }
 
 
 /* \implements AmgXSolver::setDeviceIDs */
-PetscErrorCode AmgXSolver::setDeviceIDs()
+void AmgXSolver::setDeviceIDs()
 {
-    PetscFunctionBeginUser;
-
-    PetscErrorCode      ierr;
-
     // set the ID of device that each local process will use
     if (nDevs == localSize) // # of the devices and local precosses are the same
     {
@@ -126,9 +112,9 @@ PetscErrorCode AmgXSolver::setDeviceIDs()
     }
     else if (nDevs > localSize) // there are more devices than processes
     {
-        ierr = PetscPrintf(localCpuWorld, "CUDA devices on the node %s "
+        if (myLocalRank == 0) printf("CUDA devices on the node %s "
                 "are more than the MPI processes launched. Only %d CUDA "
-                "devices will be used.\n", nodeName.c_str(), localSize); CHK;
+                "devices will be used.\n", nodeName.c_str(), localSize); 
 
         devID = myLocalRank;
         gpuProc = 0;
@@ -152,7 +138,5 @@ PetscErrorCode AmgXSolver::setDeviceIDs()
 
     // Set the device for each rank
     cudaSetDevice(devID);
-
-    PetscFunctionReturn(0);
 }
 

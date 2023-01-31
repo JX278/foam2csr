@@ -24,7 +24,7 @@
 # include <amgx_c.h>
 
 // PETSc
-# include <petscvec.h>
+// # include <petscvec.h>
 
 #include "AmgXCSRMatrix.H"
 
@@ -160,9 +160,9 @@ class AmgXSolver
          */
         void setOperator
         (
-            const PetscInt nLocalRows,
-            const PetscInt nGlobalRows,
-            const PetscInt nLocalNz,
+            const int nLocalRows,
+            const int nGlobalRows,
+            const int nLocalNz,
             AmgXCSRMatrix& matrix
         );
 
@@ -178,8 +178,8 @@ class AmgXSolver
          */
         void updateOperator
         (
-            const PetscInt nLocalRows,
-            const PetscInt nLocalNz,
+            const int nLocalRows,
+            const int nLocalNz,
             AmgXCSRMatrix& matrix
         );
 
@@ -201,8 +201,8 @@ class AmgXSolver
         void solve
         (
             int nLocalRows,
-            PetscScalar* pscalar,
-            PetscScalar* bscalar,
+            double* pscalar,
+            double* bscalar,
             AmgXCSRMatrix& matrix
         );
 
@@ -221,13 +221,13 @@ class AmgXSolver
          * \param matrix [in,out] The AmgX CSR matrix, A.
          *
          */
-        void solve
-        (
-            int nLocalRows,
-            Vec& p,
-            Vec& b,
-            AmgXCSRMatrix& matrix
-        );
+        // void solve
+        // (
+        //     int nLocalRows,
+        //     Vec& p,
+        //     Vec& b,
+        //     AmgXCSRMatrix& matrix
+        // );
 
 
         /** \brief Get the number of iterations of the last solving.
@@ -270,13 +270,13 @@ class AmgXSolver
         std::string             nodeName;
 
         /** \brief Number of local GPU devices used by AmgX.*/
-        PetscMPIInt             nDevs;
+        int             nDevs;
 
         /** \brief The ID of corresponding GPU device used by this MPI process. */
-        PetscMPIInt             devID;
+        int             devID;
 
         /** \brief A flag indicating if this process will talk to GPU. */
-        PetscMPIInt             gpuProc = MPI_UNDEFINED;
+        int             gpuProc = MPI_UNDEFINED;
 
         /** \brief A communicator for global world. */
         MPI_Comm                globalCpuWorld;
@@ -291,28 +291,28 @@ class AmgXSolver
         MPI_Comm                devWorld;
 
         /** \brief Size of \ref AmgXSolver::globalCpuWorld "globalCpuWorld". */
-        PetscMPIInt             globalSize;
+        int             globalSize;
 
         /** \brief Size of \ref AmgXSolver::localCpuWorld "localCpuWorld". */
-        PetscMPIInt             localSize;
+        int             localSize;
 
         /** \brief Size of \ref AmgXSolver::gpuWorld "gpuWorld". */
-        PetscMPIInt             gpuWorldSize;
+        int             gpuWorldSize;
 
         /** \brief Size of \ref AmgXSolver::devWorld "devWorld". */
-        PetscMPIInt             devWorldSize;
+        int             devWorldSize;
 
         /** \brief Rank in \ref AmgXSolver::globalCpuWorld "globalCpuWorld". */
-        PetscMPIInt             myGlobalRank;
+        int             myGlobalRank;
 
         /** \brief Rank in \ref AmgXSolver::localCpuWorld "localCpuWorld". */
-        PetscMPIInt             myLocalRank;
+        int             myLocalRank;
 
         /** \brief Rank in \ref AmgXSolver::gpuWorld "gpuWorld". */
-        PetscMPIInt             myGpuWorldRank;
+        int             myGpuWorldRank;
 
         /** \brief Rank in \ref AmgXSolver::devWorld "devWorld". */
-        PetscMPIInt             myDevWorldRank;
+        int             myDevWorldRank;
 
         /** \brief A parameter used by AmgX. */
         int                     ring;
