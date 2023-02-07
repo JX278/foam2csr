@@ -321,10 +321,10 @@ void AmgXSolver::updateOperator
 
 /* \implements AmgXSolver::solve */
 void AmgXSolver::solve(
-    int nLocalRows, double* pscalar, double* bscalar, AmgXCSRMatrix& matrix)
+    int nLocalRows, double* pscalar, const double* bscalar, AmgXCSRMatrix& matrix)
 {
     double* p;
-    double* b;
+    const double* b;
     int nRows;
 
     if (matrix.isConsolidated())

@@ -202,7 +202,7 @@ class AmgXSolver
         (
             int nLocalRows,
             double* pscalar,
-            double* bscalar,
+            const double* bscalar,
             AmgXCSRMatrix& matrix
         );
 
